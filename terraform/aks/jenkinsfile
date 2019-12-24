@@ -1,0 +1,75 @@
+pipeline {
+
+    options {
+        ansiColor('xterm')
+    }
+
+    agent { 
+      label 'Jenkins_Agent1'
+    }
+
+    parameters {
+        password(defaultValue: '', description: 'enter the client ID', name: 'client_id')
+        password(defaultValue: '', description: 'enter the client secret', name: 'client_secret')
+        string(defaultValue: '', description: 'enter AKS cluster resource group name', name: 'resource_group_name')
+        string(defaultValue: '', description: 'enter AKS cluster name', name: 'cluster_name')
+        string(defaultValue: 'West US 2', description: 'enter AKS cluster location ex: West US 2, East US', name: 'location')
+        string(defaultValue: 'esco-platform', description: 'enter DNS prefix specified when creating the managed cluster', name: 'dns_prefix')
+        string(defaultValue: '', description: 'enter AKS cluster subnet ID', name: 'azure_subnet_id')
+        string(defaultValue: '', description: 'enter AKS cluster log analytics workspace name', name: 'log_analytics_workspace_name')
+        string(defaultValue: 'westus2', description: 'enter AKS cluster log analytics workspace name location', name: 'log_analytics_workspace_location')
+    }
+    environment {
+        // The APPROVERS env var is used to determine who can override the destroy action protection
+        APPROVERS   = "marra05@safeway.com"
+    }
+    stages {
+        
+        stage('aks tf init') {
+            steps {
+                dir ("${env.WORKSPACE}/terraform/aks") {
+                    sh """
+                      terraform init
+                    """
+                }
+            }
+        }
+        
+        stage('aks tf plan') {
+            steps {
+                dir ("${env.WORKSPACE}/terraform/aks") {
+                    sh """
+                      terraform plan -var="client_id=$client_id" -var="client_secret=$client_secret" -var="dns_prefix=$dns_prefix" -var="cluster_name=$cluster_name" -var="resource_group_name=$resource_group_name" -var="location=$location" -var="log_analytics_workspace_name=$log_analytics_workspace_name" -var="log_analytics_workspace_location=$log_analytics_workspace_location" -var="azure_subnet_id=$azure_subnet_id"
+                    """
+                }
+            }
+        }
+
+        stage('aks tf apply') {
+            steps {
+                dir ("${env.WORKSPACE}/frontend") {
+                    script {
+                        input(message: "\nWARNING! Destroying/tainting redis instances will causes service interruption! Is this what you intend to do?", submitter: "${env.APPROVERS}")
+                        sh """
+                          terraform apply -var="client_id=$client_id" -var="client_secret=$client_secret" -var="dns_prefix=$dns_prefix" -var="cluster_name=$cluster_name -var="resource_group_name=$resource_group_name" -var="location=$location" -var="log_analytics_workspace_name=$log_analytics_workspace_name" -var="log_analytics_workspace_location=$log_analytics_workspace_location" -var="azure_subnet_id=$azure_subnet_id -auto-approve"
+                        """
+                    }
+                }
+            }
+        }  
+       
+    }
+    // Post describes the steps to take when the pipeline finishes
+    post {
+        //changed {}
+        //aborted {}
+        //failure {}
+        //success {}
+        //unstable {}
+        //notBuilt {}
+        always {
+            echo "Clearing workspace"
+            deleteDir() // Clean up the local workspace so we don't leave behind a mess, or sensitive files
+        }
+    }
+}
