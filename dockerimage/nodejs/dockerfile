@@ -1,0 +1,19 @@
+FROM ubuntu:16.04
+
+RUN groupadd --gid 1000 node \
+  && useradd --uid 1000 --gid node --shell /bin/bash --create-home node
+
+ENV NODE_VERSION 10.17.0
+
+#Installing Nodejs 10.x version
+ADD docker_baseimages/Nodejs/setup_10_x.sh .
+RUN bash setup_10_x.sh
+RUN rm -f setup_10_x.sh
+
+RUN apt-get install -y nodejs
+
+COPY docker_baseimages/Nodejs/docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+CMD [ "node" ]
