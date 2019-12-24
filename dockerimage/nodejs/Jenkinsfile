@@ -1,0 +1,32 @@
+pipeline {
+  options {
+    ansiColor('xterm')
+  }   
+  environment {
+    registry           = "z****"
+    registryCredential = '***'
+    dockerImage        = ''
+  }
+  agent { 
+    label 'Jenkins_Agent1'
+  }
+  stages {
+    stage('Building image') {
+      steps{
+        script {
+          dockerImage = docker.build(registry + "/ubuntu/nodejs:10.x", "-f docker_baseimages/Nodejs/Dockerfile .")
+        }
+      }
+    }
+    
+    stage('push Image to acr') {
+      steps{
+        script {
+          docker.withRegistry( 'https://' + registry, registryCredential ) {
+          dockerImage.push()
+          }
+        }
+      }
+    }
+  }
+}
