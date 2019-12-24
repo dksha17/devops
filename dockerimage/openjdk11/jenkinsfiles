@@ -1,0 +1,32 @@
+pipeline {
+  options {
+    ansiColor('xterm')
+  }   
+  environment {
+    registry           = "zpuwenterprisecr.azurecr.io"
+    registryCredential = 'acr_registry_creds_prod'
+    dockerImage        = ''
+  }
+  agent { 
+    label 'Jenkins_Agent1'
+  }
+  stages {
+    stage('Building image') {
+      steps{
+        script {
+          dockerImage = docker.build(registry + "/ubuntu/openjdk:11.x", "-f docker_baseimages/openjdk11/Dockerfile .")
+        }
+      }
+    }
+    
+    stage('push Image to acr') {
+      steps{
+        script {
+          docker.withRegistry( 'https://' + registry, registryCredential ) {
+          dockerImage.push()
+          }
+        }
+      }
+    }
+  }
+}
