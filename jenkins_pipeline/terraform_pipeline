@@ -1,0 +1,88 @@
+// This software is provided subject to the PSA and accompanying SOW between the parties
+
+pipeline {
+    agent { 
+      label 'Jenkins_slave01'
+    }
+    options {
+        ansiColor('xterm')
+    }
+    //parameters {
+    //    booleanParam(name: 'refresh', defaultValue: true, description: 'Refresh job config to update UI from Pipeline')
+    // }
+    environment {
+        TERRAFORM_DIR   = "${env.WORKSPACE}"
+        ARM_CLIENT_ID="********"
+        ARM_CLIENT_SECRET="*********"
+        ARM_SUBSCRIPTION_ID="***********"
+        ARM_TENANT_ID="*************"
+        // The APPROVERS env var is used to determine who can override the destroy action protection
+        APPROVERS   = "abc@gmail.com"
+    }
+    stages {
+        stage('Checkout from git') {
+          steps {
+
+            // Checkout both recommendationservice and the Jenkins standard lib
+            dir ("${env.TERRAFORM_DIR}"){
+              checkout scm: [
+                $class: 'GitSCM', userRemoteConfigs: [
+                  [
+                    url: 'https://github.com/as/devops.git',
+                    credentialsId: 'dev-github-creds',
+                    changelog: false,
+                  ]
+                ],
+                branches: [
+                  [
+                    name: "refs/heads/master"
+                  ]
+                ],
+                poll: false
+              ]
+            }
+          }
+        }
+
+        stage(' Azure auth action') {
+            steps {
+                    script {
+                        withCredentials([azureServicePrincipal('Azure-Prod-SP')]) {
+                        sh  'env'
+                        }
+
+                    }
+            }
+        }
+
+        stage('plan action') {
+            steps {
+                dir ("${TERRAFORM_DIR}/vm_creation") {
+                    script {
+                        sh '/usr/local/bin/terraform init'
+                        sh '/usr/local/bin/terraform plan  -var-file="params.tfvars"'                      
+                    }
+                }
+            }
+        }
+
+        stage('apply action') {
+            steps {
+                dir ("${TERRAFORM_DIR}/vm_creation") {
+                    script {
+                            input(message: "\nWARNING! applying will create the resources will causes resources modification which exists already, Is this what you intend to do?", submitter: "${env.APPROVERS}")
+                            sh '/usr/local/bin/terraform apply -var-file="params.tfvars" -auto-approve'
+                        }
+                    }
+                }
+            
+    // Post describes the steps to take when the pipeline finishes
+    post {
+        always {
+            echo "Clearing workspace"
+            deleteDir() // Clean up the local workspace so we don't leave behind a mess, or sensitive files
+                }
+            }
+        } 
+    }
+}
