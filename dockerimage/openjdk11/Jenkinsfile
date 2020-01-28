@@ -3,13 +3,11 @@ pipeline {
     ansiColor('xterm')
   }   
   environment {
-    registry           = "zpuwenterprisecr.azurecr.io"
-    registryCredential = 'acr_registry_creds_prod'
+    registry           = "hub.docker.com/dksha17/java"
+    registryCredential = 'Chandigarh@1'
     dockerImage        = ''
   }
-  agent { 
-    label 'Jenkins_Agent1'
-  }
+  agent any
   stages {
     stage('Building image') {
       steps{
